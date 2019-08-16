@@ -57,11 +57,14 @@ class OneAll(object):
         :param dict post_params: POST parameters for action
         :returns dict: The JSON result of the call in a dictionary format
         """
+        print('Requested action', action)
+
         request_url = '%s/%s.%s' % (self.base_url, action, OneAll.FORMAT__JSON)
         if params:
             for ix, (param, value) in enumerate(params.items()):
                 request_url += "%s%s=%s" % (('?' if ix == 0 else '&'), param, value)
-        req = Request(request_url, dumps(post_params) if post_params else None, {'Content-Type': 'application/json'})
+
+        req = Request(request_url, dumps(post_params).encode('utf-8') if post_params else None, {'Content-Type': 'application/json'})
         token = '%s:%s' % (self.public_key, self.private_key)
         auth = standard_b64encode(token.encode())
         req.add_header('Authorization', 'Basic %s' % auth.decode())
@@ -72,6 +75,7 @@ class OneAll(object):
             if e.code == 401:
                 raise BadOneAllCredentials
             else:
+                print('Something went wrong while connecting', e)
                 raise
         return loads(request.read().decode())
 
@@ -168,7 +172,7 @@ class OneAll(object):
         connection.response = response
         return connection
 
-    def publish(self, user_token, post_params):
+    def publish(self, user_token, post_params, info):
         """
         Publish a message on behalf of the user
 
@@ -176,7 +180,22 @@ class OneAll(object):
         :param dict post_params: The message in the format described in OneAll documentation
         :returns OADict: The API response
         """
-        return OADict(**self._exec('users/%s/publish' % user_token, post_params=post_params))
+        # return OADict(**self._exec('users/%s/publish' % user_token, post_params=post_params))
+
+        return OADict(**self._exec('push/identities/%s/%s/%s' % (user_token, info['platform'], info['post_type']) , post_params=post_params))
+    
+    def pull_info(self, user_token, params, info):
+        """
+        Retrieve information about an user/post/pages
+
+        :param str user_token
+        :param dict params : get parameters required for the api call
+        :info json : other info containing the platform name and the type of api action
+        """
+        if params is None:
+            params = ""
+
+        return OADict(**self._exec('pull/identities/%s/%s/%s' % (user_token, info['platform'], info['post_type']) , params=params))
 
     def set_version(self, social_version, platform_name, platform_version):
         """
